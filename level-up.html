@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Level Up">
+<title>Level Up</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&display=swap');
+  :root {
+    --bg: #0a0a0f;
+    --panel: #12121a;
+    --border: #2a2a3a;
+    --yellow: #f5c400;
+    --green: #39ff14;
+    --red: #ff2442;
+    --blue: #00b4ff;
+    --white: #e8e8f0;
+    --dim: #555570;
+    --scanline: rgba(0,0,0,0.12);
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html, body { height:100%; background:var(--bg); color:var(--white); font-family:'Press Start 2P',monospace; overflow:hidden; }
+  body::before {
+    content:''; position:fixed; inset:0; pointer-events:none; z-index:9000;
+    background:repeating-linear-gradient(0deg,transparent,transparent 2px,var(--scanline) 2px,var(--scanline) 4px);
+  }
+  @keyframes flicker { 0%,100%{opacity:1} 92%{opacity:1} 93%{opacity:.97} 94%{opacity:1} 96%{opacity:.95} 97%{opacity:1} }
+  @keyframes blink   { 0%,100%{opacity:1} 50%{opacity:0} }
+  @keyframes fadeIn  { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  body { animation:flicker 8s infinite; }
+  /* ── SHARED SHELL ── */
+  #app {
+    display:flex; flex-direction:column;
+    height:100dvh; max-width:430px; margin:0 auto; overflow:hidden;
+    position:relative;
+  }
+  /* ── HEADER ── */
+  #header {
+    background:var(--panel); border-bottom:3px solid var(--yellow);
+    padding:0 12px; height:44px;
+    display:flex; align-items:center; gap:10px; flex-shrink:0; z-index:10;
+  }
+  #header h1 { font-size:11px; color:var(--yellow); text-shadow:0 0 8px var(--yellow),2px 2px 0 #7a6200; letter-spacing:1px; white-space:nowrap; }
+  .hdr-sep  { width:2px; height:18px; background:var(--border); flex-shrink:0; }
+  #hdr-day  { font-family:'VT323',monospace; font-size:20px; color:var(--green); white-space:nowrap; }
+  #hdr-date { font-family:'VT323',monospace; font-size:18px; color:var(--blue);  white-space:nowrap; }
+  .hdr-space { flex:1; }
+  /* hamburger / close */
+  #menu-btn {
+    width:36px; height:36px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px;
+    cursor:pointer; background:none; border:2px solid var(--border); padding:6px; flex-shrink:0;
+  }
+  #menu-btn span { display:block; width:18px; height:2px; background:var(--yellow); transition:all 0.2s; }
+  #menu-btn.open span:nth-child(1) { transform:translateY(7px) rotate(45deg); }
+  #menu-btn.open span:nth-child(2) { opacity:0; }
+  #menu-btn.open span:nth-child(3) { transform:translateY(-7px) rotate(-45deg); }
+  /* ── SCREENS (full-size swappable) ── */
+  /* all screens sit in the same space below header */
+  .screen {
+    position:absolute; top:44px; left:0; right:0; bottom:0;
+    overflow-y:auto; overflow-x:hidden;
+    -webkit-overflow-scrolling:touch;
+    display:none;
+  }
+  .screen.active { display:block; animation:fadeIn 0.2s ease; }
+  /* ── CARD / COMMON ── */
+  .card { background:var(--panel); border:3px solid var(--border); margin-bottom:14px; padding:14px; position:relative; }
+  .card::before { content:''; position:absolute; top:-1px; left:4px; right:4px; height:1px; background:rgba(255,255,255,0.05); }
+  .card-title { font-size:8px; color:var(--yellow); letter-spacing:2px; margin-bottom:12px; text-shadow:0 0 6px var(--yellow); }
+  .stat-row { display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:2px solid var(--border); }
+  .stat-row:last-child { border-bottom:none; }
+  .stat-label { font-family:'VT323',monospace; font-size:17px; color:var(--dim); }
+  .stat-value { font-family:'VT323',monospace; font-size:18px; color:var(--white); }
+  .stat-value.good { color:var(--green); }
+  .stat-value.warn { color:var(--yellow); }
+  .stat-value.bad  { color:var(--red); }
+  .stat-value.dim  { color:var(--dim); }
+  .progress-wrap { height:12px; background:var(--bg); border:2px solid var(--border); margin-bottom:0; overflow:hidden; }
+  .progress-bar  { height:100%; background:var(--green); transition:width 1s linear,background 0.5s; position:relative; }
+  .progress-bar.warning { background:var(--yellow); }
+  .progress-bar.overtime { background:var(--red); width:100%!important; }
+  .btn { display:block; width:100%; padding:14px; font-family:'Press Start 2P',monospace; font-size:10px; letter-spacing:1px; border:3px solid; background:transparent; cursor:pointer; text-align:center; margin-bottom:10px; }
+  .btn:active { transform:translate(2px,2px); }
+  .btn-green { color:var(--green); border-color:var(--green); }
+  .btn-green:not(:disabled):active { background:rgba(57,255,20,0.08); }
+  .btn-red   { color:var(--red);   border-color:var(--red); }
+  .btn-red:active   { background:rgba(255,36,66,0.08); }
+  .btn-dim   { color:var(--dim);   border-color:var(--border); font-size:8px; }
+  .btn:disabled { opacity:.3; cursor:not-allowed; }
+  /* ── CHECKLIST SCREEN ── */
+  #screen-checklist { padding:16px; }
+  .check-item { display:flex; align-items:flex-start; gap:12px; padding:12px 0; border-bottom:2px solid var(--border); cursor:pointer; transition:opacity 0.15s; }
+  .check-item:last-child { border-bottom:none; padding-bottom:0; }
+  .check-item:first-child { padding-top:0; }
+  .check-item.done { opacity:0.4; }
+  .pixel-check { width:24px; height:24px; min-width:24px; border:3px solid var(--dim); background:var(--bg); display:flex; align-items:center; justify-content:center; transition:all 0.15s; }
+  .pixel-check.checked { border-color:var(--green); background:rgba(57,255,20,0.1); }
+  .pixel-check.checked::after { content:'✓'; color:var(--green); font-size:16px; font-family:'VT323',monospace; text-shadow:0 0 6px var(--green); }
+  .check-label { font-family:'VT323',monospace; font-size:21px; color:var(--white); line-height:1.2; padding-top:2px; }
+  .check-item.done .check-label { text-decoration:line-through; }
+  #checklist-progress { text-align:center; padding:10px 0 2px; font-family:'VT323',monospace; font-size:18px; color:var(--dim); }
+  #checklist-progress .prog-count { color:var(--yellow); font-size:22px; }
+  #sunday-block { text-align:center; padding:40px 16px; }
+  #sunday-block .big-x { font-size:64px; color:var(--red); text-shadow:0 0 20px var(--red); display:block; margin-bottom:16px; }
+  #sunday-block p { font-family:'VT323',monospace; font-size:24px; color:var(--red); line-height:1.7; }
+  /* ── TIMER SCREEN ── */
+  #screen-timer { padding:16px; }
+  .timer-card-header {
+    display:flex; align-items:baseline; justify-content:space-between;
+    margin-bottom:8px; gap:6px; flex-wrap:wrap;
+  }
+  .timer-card-header .card-title { margin-bottom:0; flex-shrink:0; }
+  #timer-allowed-inline { font-family:'VT323',monospace; font-size:17px; color:var(--blue); white-space:nowrap; }
+  #timer-display {
+    font-size:76px; text-align:center; color:var(--green);
+    text-shadow:0 0 24px var(--green),0 0 48px rgba(57,255,20,0.15);
+    letter-spacing:6px; padding:8px 0 4px; font-family:'VT323',monospace; line-height:1;
+  }
+  #timer-display.warning { color:var(--yellow); text-shadow:0 0 24px var(--yellow); }
+  #timer-display.overtime { color:var(--red); text-shadow:0 0 24px var(--red); animation:blink 0.5s step-end infinite; }
+  #timer-sublabel { text-align:center; font-family:'VT323',monospace; font-size:15px; color:var(--dim); margin-bottom:8px; }
+  #timer-progress-wrap { height:12px; background:var(--bg); border:2px solid var(--border); margin-bottom:16px; overflow:hidden; }
+  #timer-progress-bar  { height:100%; background:var(--green); transition:width 1s linear,background 0.5s; }
+  #timer-progress-bar.warning { background:var(--yellow); }
+  #timer-progress-bar.overtime { background:var(--red); width:100%!important; }
+  /* Inline week report on timer screen */
+  .week-mini-row { display:flex; align-items:center; gap:6px; margin-bottom:8px; }
+  .week-mini-day { font-family:'VT323',monospace; font-size:16px; width:30px; color:var(--dim); flex-shrink:0; }
+  .week-mini-day.today { color:var(--yellow); }
+  .week-mini-track { flex:1; height:14px; background:var(--bg); border:2px solid var(--border); overflow:hidden; }
+  .week-mini-fill  { height:100%; background:var(--blue); transition:width 0.4s ease; }
+  .week-mini-fill.over    { background:var(--red); }
+  .week-mini-fill.perfect { background:var(--green); }
+  .week-mini-min  { font-family:'VT323',monospace; font-size:13px; color:var(--dim); width:46px; text-align:right; flex-shrink:0; }
+  .week-cap-row   { display:flex; justify-content:space-between; align-items:center; padding-top:8px; margin-top:4px; border-top:2px solid var(--border); }
+  .week-cap-label { font-family:'VT323',monospace; font-size:15px; color:var(--dim); }
+  .week-cap-val   { font-family:'VT323',monospace; font-size:16px; }
+  /* ── MENU SCREEN ── */
+  #screen-menu { padding:0; }
+  #menu-tabs { display:flex; border-bottom:3px solid var(--border); background:var(--panel); flex-shrink:0; }
+  .menu-tab { flex:1; padding:11px 4px; text-align:center; font-size:7px; color:var(--dim); cursor:pointer; border-right:2px solid var(--border); position:relative; }
+  .menu-tab:last-child { border-right:none; }
+  .menu-tab.active { color:var(--yellow); background:rgba(245,196,0,0.07); }
+  .menu-tab.active::after { content:''; position:absolute; bottom:0; left:0; right:0; height:3px; background:var(--yellow); }
+  .menu-tab-icon { font-size:16px; display:block; margin-bottom:3px; }
+  #menu-pages { padding:14px; }
+  .menu-page { display:none; }
+  .menu-page.active { display:block; animation:fadeIn 0.15s ease; }
+  /* Report inside menu */
+  .week-bar-row { display:flex; align-items:center; gap:6px; margin-bottom:9px; }
+  .week-bar-day { font-family:'VT323',monospace; font-size:17px; width:32px; color:var(--dim); flex-shrink:0; }
+  .week-bar-day.today { color:var(--yellow); }
+  .week-bar-track { flex:1; height:16px; background:var(--bg); border:2px solid var(--border); overflow:hidden; }
+  .week-bar-fill  { height:100%; background:var(--blue); transition:width 0.4s ease; }
+  .week-bar-fill.over    { background:var(--red); }
+  .week-bar-fill.perfect { background:var(--green); }
+  .week-bar-min   { font-family:'VT323',monospace; font-size:14px; color:var(--dim); width:50px; text-align:right; flex-shrink:0; }
+  .history-week { margin-bottom:8px; border:2px solid var(--border); }
+  .history-week-header { background:var(--border); padding:7px 10px; font-family:'VT323',monospace; font-size:15px; color:var(--dim); display:flex; justify-content:space-between; cursor:pointer; }
+  .history-week-body { padding:8px 10px; display:none; }
+  .history-week-body.open { display:block; }
+  .section-divider { font-size:7px; color:var(--dim); letter-spacing:3px; text-align:center; padding:6px 0 10px; }
+  /* Settings inside menu */
+  .setting-group-title { font-size:7px; color:var(--blue); letter-spacing:2px; margin-bottom:10px; }
+  .setting-item { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:2px solid var(--border); }
+  .setting-item:last-child { border-bottom:none; }
+  .setting-item input[type="text"] {
+    flex:1; background:var(--bg); border:2px solid var(--border); color:var(--white);
+    font-family:'VT323',monospace; font-size:17px; padding:5px 7px; outline:none; min-width:0;
+  }
+  .setting-item input[type="text"]:focus { border-color:var(--yellow); }
+  .setting-item input[type="number"] {
+    width:58px; background:var(--bg); border:2px solid var(--border); color:var(--yellow);
+    font-family:'VT323',monospace; font-size:20px; padding:4px 5px; text-align:center; outline:none;
+    -moz-appearance:textfield;
+  }
+  .setting-item input[type="number"]::-webkit-inner-spin-button,
+  .setting-item input[type="number"]::-webkit-outer-spin-button { -webkit-appearance:none; }
+  .setting-item input[type="number"]:focus { border-color:var(--yellow); }
+  .setting-day-label { font-family:'VT323',monospace; font-size:17px; color:var(--dim); width:34px; flex-shrink:0; }
+  .setting-unit { font-family:'VT323',monospace; font-size:13px; color:var(--dim); flex-shrink:0; }
+  .del-btn { background:none; border:2px solid var(--red); color:var(--red); font-size:13px; width:26px; height:26px; flex-shrink:0; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .del-btn:active { transform:scale(0.9); }
+  .add-item-btn { background:none; border:2px dashed var(--green); color:var(--green); font-family:'VT323',monospace; font-size:17px; padding:7px; width:100%; cursor:pointer; margin-top:8px; }
+  /* Toast */
+  #toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--panel); border:3px solid var(--green); color:var(--green); font-size:8px; padding:10px 16px; opacity:0; transition:all 0.3s; pointer-events:none; white-space:nowrap; z-index:9500; text-shadow:0 0 8px var(--green); }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  .screen::-webkit-scrollbar { width:3px; }
+  .screen::-webkit-scrollbar-track { background:var(--bg); }
+  .screen::-webkit-scrollbar-thumb { background:var(--border); }
+  #menu-pages::-webkit-scrollbar { width:3px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- HEADER -->
+  <div id="header">
+    <h1>⬛ LEVEL UP</h1>
+    <div class="hdr-sep"></div>
+    <span id="hdr-day">---</span>
+    <span id="hdr-date">--/--</span>
+    <div class="hdr-space"></div>
+    <button id="menu-btn" onclick="toggleMenu()">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+  <!-- ══ SCREEN: CHECKLIST ══ -->
+  <div class="screen active" id="screen-checklist">
+    <div id="sunday-block" style="display:none">
+      <span class="big-x">✖</span>
+      <p>SUNDAY IS<br>RECHARGE DAY.<br>NO GAMES TODAY!</p>
+    </div>
+    <div class="card" id="checklist-card">
+      <div class="card-title">▶ PRE-GAME CHECKLIST</div>
+      <div id="checklist-items"></div>
+      <div id="checklist-progress"></div>
+    </div>
+    <!-- back to timer (shown only when checklist is complete) -->
+    <button class="btn btn-dim" id="btn-back-to-timer" onclick="goScreen('timer')" style="display:none">▶ BACK TO TIMER</button>
+  </div>
+  <!-- ══ SCREEN: TIMER ══ -->
+  <div class="screen" id="screen-timer">
+    <!-- Timer card -->
+    <div style="padding:16px 16px 0">
+      <div class="card">
+        <div class="timer-card-header">
+          <div class="card-title" id="timer-day-label">SESSION</div>
+          <div id="timer-allowed-inline"></div>
+        </div>
+        <div id="timer-display">00:00</div>
+        <div id="timer-sublabel">TODAY'S TOTAL</div>
+        <div id="timer-progress-wrap"><div id="timer-progress-bar"></div></div>
+      </div>
+    </div>
+    <!-- Start / Stop -->
+    <div style="padding:0 16px">
+      <button class="btn btn-green" id="btn-start" onclick="startTimer()" style="font-size:12px;padding:18px">▶ START</button>
+      <button class="btn btn-red"   id="btn-stop"  onclick="stopTimer()"  style="display:none;font-size:12px;padding:18px">■ STOP</button>
+    </div>
+    <!-- Session log -->
+    <div style="padding:0 16px">
+      <div class="card">
+        <div class="card-title">TODAY'S SESSIONS</div>
+        <div id="session-log"></div>
+      </div>
+    </div>
+    <!-- Inline week report -->
+    <div style="padding:0 16px">
+      <div class="card">
+        <div class="card-title">THIS WEEK</div>
+        <div id="timer-week-bars"></div>
+        <div class="week-cap-row">
+          <span class="week-cap-label">WEEK REMAINING</span>
+          <span class="week-cap-val" id="timer-week-remain">--</span>
+        </div>
+        <div class="progress-wrap" style="margin-top:8px"><div class="progress-bar" id="timer-weekly-bar"></div></div>
+      </div>
+    </div>
+    <!-- Back to checklist -->
+    <div style="padding:0 16px 16px">
+      <button class="btn btn-dim" onclick="goBackToChecklist()">↺ BACK TO CHECKLIST</button>
+    </div>
+  </div>
+  <!-- ══ SCREEN: MENU ══ -->
+  <div class="screen" id="screen-menu">
+    <div id="menu-tabs">
+      <div class="menu-tab active" id="mtab-report"   onclick="switchMenuTab('report')">  <span class="menu-tab-icon">📊</span>REPORT</div>
+      <div class="menu-tab"        id="mtab-settings" onclick="switchMenuTab('settings')"><span class="menu-tab-icon">⚙️</span>SETTINGS</div>
+    </div>
+    <div id="menu-pages">
+      <!-- REPORT -->
+      <div class="menu-page active" id="mpage-report">
+        <div class="card" style="margin-top:2px">
+          <div class="card-title">📊 THIS WEEK</div>
+          <div id="week-bars"></div>
+          <div style="margin-top:10px">
+            <div class="stat-row"><span class="stat-label">WEEK TOTAL</span><span class="stat-value" id="rpt-total">0m</span></div>
+            <div class="stat-row"><span class="stat-label">WEEKLY CAP</span><span class="stat-value" id="rpt-cap">--</span></div>
+            <div class="stat-row"><span class="stat-label">REMAINING</span> <span class="stat-value" id="rpt-remaining">--</span></div>
+          </div>
+          <div class="progress-wrap" style="margin-top:8px"><div class="progress-bar" id="weekly-progress-bar"></div></div>
+        </div>
+        <div class="section-divider">— PAST 6 WEEKS —</div>
+        <div id="history-list"></div>
+        <button class="btn btn-red" onclick="confirmReset()" style="font-size:7px;margin-top:4px">⚠ RESET WEEK DATA</button>
+      </div>
+      <!-- SETTINGS -->
+      <div class="menu-page" id="mpage-settings">
+        <div class="card" style="margin-top:2px">
+          <div class="card-title">⚙ CHECKLIST ITEMS</div>
+          <div class="setting-group-title">EDIT LABEL · ✕ TO REMOVE</div>
+          <div id="settings-checklist"></div>
+          <button class="add-item-btn" onclick="addChecklistItem()">+ ADD ITEM</button>
+        </div>
+        <div class="card">
+          <div class="card-title">⏱ DAILY LIMITS</div>
+          <div class="setting-group-title">MINUTES PER DAY (0 = BLOCKED)</div>
+          <div id="settings-limits"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📅 WEEKLY CAP</div>
+          <div class="setting-item">
+            <span style="font-family:'VT323',monospace;font-size:17px;color:var(--white);flex:1">MAX MIN/WEEK</span>
+            <input type="number" id="settings-weekly-cap" min="0" max="9999">
+            <span class="setting-unit">MIN</span>
+          </div>
+        </div>
+        <button class="btn" style="color:var(--blue);border-color:var(--blue)" onclick="saveSettings()">💾 SAVE SETTINGS</button>
+        <button class="btn btn-dim" onclick="restoreDefaults()">↺ RESTORE DEFAULTS</button>
+      </div>
+    </div><!-- /menu-pages -->
+  </div><!-- /screen-menu -->
+</div><!-- /app -->
+<div id="toast"></div>
+<script>
+// ════════════════════════════════
+//  DEFAULTS
+// ════════════════════════════════
+const DEFAULT_CHECKLIST = [
+  {id:'school',   label:'School work is done for today'},
+  {id:'chores',   label:'Chores are finished'},
+  {id:'courses',  label:'Online courses / lessons cleared'},
+  {id:'coop',     label:'Cooperating with parents (no attitude)'},
+  {id:'noblowup', label:'No blowups or big issues today'},
+];
+const DEFAULT_DAY_LIMIT = {0:0,1:45,2:45,3:45,4:45,5:45,6:90};
+const DEFAULT_WEEK_CAP  = 240;
+const DAY_NAMES  = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+const FULL_NAMES = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+// ════════════════════════════════
+//  SETTINGS
+// ════════════════════════════════
+function loadSettings(){ try{return JSON.parse(localStorage.getItem('levelup_settings')||'null');}catch(e){return null;} }
+function saveSettingsData(s){ localStorage.setItem('levelup_settings',JSON.stringify(s)); }
+function getSettings(){ return loadSettings()||{checklist:DEFAULT_CHECKLIST.map(i=>({...i})),dayLimit:{...DEFAULT_DAY_LIMIT},weekCap:DEFAULT_WEEK_CAP}; }
+let CFG=getSettings();
+function reloadCFG(){ CFG=getSettings(); }
+// ════════════════════════════════
+//  DATA
+// ════════════════════════════════
+function loadData(){ try{return JSON.parse(localStorage.getItem('levelup_v2')||'{}');}catch(e){return{};} }
+function saveData(d){ localStorage.setItem('levelup_v2',JSON.stringify(d)); }
+function todayKey(){
+  const d=new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function weekKey(){
+  const d=new Date(),day=d.getDay()||7;
+  const mon=new Date(d); mon.setDate(d.getDate()-day+1);
+  return `${mon.getFullYear()}-W${String(getISOWeek(mon)).padStart(2,'0')}`;
+}
+function getISOWeek(d){
+  const j=new Date(d.getFullYear(),0,4);
+  const w1=new Date(j); w1.setDate(j.getDate()-(j.getDay()||7)+1);
+  return Math.ceil(((d-w1)/86400000+1)/7);
+}
+function getDaySavedSec(key){ return loadData().days?.[key]||0; }
+function getDayMinutes(key){ return Math.round(getDaySavedSec(key)/60); }
+function addDaySeconds(key,secs){
+  const d=loadData(); if(!d.days)d.days={};
+  d.days[key]=(d.days[key]||0)+secs; saveData(d);
+}
+function getWeekUsedMin(){
+  const data=loadData(),d=new Date(),dow=d.getDay()||7; let tot=0;
+  for(let i=1;i<=dow;i++){
+    const dd=new Date(d); dd.setDate(d.getDate()-dow+i);
+    tot+=Math.round((data.days?.[`${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,'0')}-${String(dd.getDate()).padStart(2,'0')}`]||0)/60);
+  }
+  return tot;
+}
+// ════════════════════════════════
+//  HEADER
+// ════════════════════════════════
+function updateHeader(){
+  const d=new Date();
+  document.getElementById('hdr-day').textContent  = FULL_NAMES[d.getDay()].toUpperCase();
+  document.getElementById('hdr-date').textContent = `${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+}
+// ════════════════════════════════
+//  SCREEN ROUTING
+// ════════════════════════════════
+let currentScreen='checklist'; // 'checklist' | 'timer' | 'menu'
+let prevScreen='checklist';    // screen to return to when closing menu
+function goScreen(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  currentScreen=name;
+  // Update menu button appearance
+  document.getElementById('menu-btn').classList.toggle('open', name==='menu');
+  // Trigger renders
+  if(name==='checklist')  renderChecklist();
+  if(name==='timer')      renderTimerView();
+  if(name==='menu')       renderReport();
+  document.getElementById('screen-'+name).scrollTop=0;
+}
+function toggleMenu(){
+  if(currentScreen==='menu'){
+    goScreen(prevScreen);
+  } else {
+    prevScreen=currentScreen;
+    goScreen('menu');
+  }
+}
+// ════════════════════════════════
+//  MENU TABS
+// ════════════════════════════════
+function switchMenuTab(name){
+  document.querySelectorAll('.menu-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.menu-page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('mtab-'+name).classList.add('active');
+  document.getElementById('mpage-'+name).classList.add('active');
+  document.getElementById('menu-pages').scrollTop=0;
+  if(name==='report')   renderReport();
+  if(name==='settings') renderSettingsPage();
+}
+// ════════════════════════════════
+//  INIT MAIN VIEW
+// ════════════════════════════════
+function initMain(){
+  reloadCFG();
+  const dow=new Date().getDay();
+  if(dow===0){
+    // Sunday: show checklist screen with sunday block
+    goScreen('checklist');
+    return;
+  }
+  const checks=loadChecks(), items=CFG.checklist;
+  const allDone=items.length>0&&items.every(i=>checks[i.id]);
+  goScreen(allDone?'timer':'checklist');
+}
+// ════════════════════════════════
+//  CHECKLIST
+// ════════════════════════════════
+function loadChecks()       { return loadData().checklist?.[todayKey()]||{}; }
+function saveChecks(checks) { const d=loadData(); if(!d.checklist)d.checklist={}; d.checklist[todayKey()]=checks; saveData(d); }
+function renderChecklist(){
+  reloadCFG();
+  const dow=new Date().getDay(), isSun=dow===0;
+  document.getElementById('sunday-block').style.display   = isSun?'block':'none';
+  document.getElementById('checklist-card').style.display = isSun?'none':'block';
+  if(isSun){ document.getElementById('btn-back-to-timer').style.display='none'; return; }
+  const checks=loadChecks(), items=CFG.checklist;
+  const allDone=items.length>0&&items.every(i=>checks[i.id]);
+  const doneCount=items.filter(i=>checks[i.id]).length;
+  // "Back to timer" button — only show if all done
+  document.getElementById('btn-back-to-timer').style.display=allDone?'block':'none';
+  const container=document.getElementById('checklist-items');
+  container.innerHTML='';
+  items.forEach(item=>{
+    const ok=!!checks[item.id];
+    const div=document.createElement('div');
+    div.className='check-item'+(ok?' done':'');
+    div.innerHTML=`<div class="pixel-check ${ok?'checked':''}"></div><div class="check-label">${escHtml(item.label)}</div>`;
+    div.addEventListener('click',()=>toggleCheck(item.id));
+    container.appendChild(div);
+  });
+  const prog=document.getElementById('checklist-progress');
+  if(allDone){
+    prog.innerHTML='';
+  } else if(doneCount===0){
+    prog.innerHTML=`<span style="color:var(--dim)">CHECK OFF EACH TASK TO UNLOCK TIMER</span>`;
+  } else {
+    prog.innerHTML=`<span class="prog-count">${doneCount}/${items.length}</span> <span style="color:var(--dim)">COMPLETE</span>`;
+  }
+}
+function toggleCheck(id){
+  const c=loadChecks(); c[id]=!c[id];
+  saveChecks(c);
+  reloadCFG();
+  const items=CFG.checklist;
+  const allDone=items.length>0&&items.every(i=>c[i.id]);
+  if(allDone){
+    showToast('✅ ALL DONE — GAME ON!');
+    setTimeout(()=>goScreen('timer'), 600);
+  } else {
+    renderChecklist();
+  }
+}
+function goBackToChecklist(){
+  if(timerRunning){ showToast('STOP TIMER FIRST'); return; }
+  goScreen('checklist');
+}
+// ════════════════════════════════
+//  TIMER
+// ════════════════════════════════
+let timerInterval=null, timerRunning=false, sessionStart=null;
+function getAllowedMin(){ reloadCFG(); return CFG.dayLimit[new Date().getDay()]??0; }
+function getLiveSec(){
+  const saved=getDaySavedSec(todayKey());
+  return timerRunning ? saved+Math.floor((Date.now()-sessionStart)/1000) : saved;
+}
+function renderTimerView(){
+  reloadCFG();
+  const dow=new Date().getDay();
+  document.getElementById('timer-day-label').textContent = FULL_NAMES[dow].toUpperCase()+"'S SESSION";
+  renderTimerAllowed();
+  renderSessionLog();
+  renderTimerWeekBars();
+  updateTimerDisplay();
+}
+function renderTimerAllowed(){
+  const allowed=getAllowedMin();
+  const liveSec=getLiveSec();
+  const usedMin=Math.round(liveSec/60);
+  const leftMin=Math.max(0,allowed-usedMin);
+  document.getElementById('timer-allowed-inline').innerHTML=
+    `<span style="color:var(--green)">${allowed}m</span>&nbsp;·&nbsp;<span style="color:var(--blue)">${leftMin}m left</span>`;
+}
+function updateTimerDisplay(){
+  const allowedSec=getAllowedMin()*60;
+  const liveSec=getLiveSec();
+  const display=document.getElementById('timer-display');
+  const bar=document.getElementById('timer-progress-bar');
+  display.textContent=fmtSec(liveSec);
+  const pct=allowedSec>0?Math.min(100,(liveSec/allowedSec)*100):0;
+  bar.style.width=pct+'%';
+  if(pct>=100){     display.className='overtime'; bar.className='overtime'; }
+  else if(pct>=80){ display.className='warning';  bar.className='warning'; }
+  else {            display.className='';          bar.className=''; }
+  renderTimerAllowed();
+}
+function renderSessionLog(){
+  const sessions=loadData().sessions?.[todayKey()]||[];
+  const el=document.getElementById('session-log');
+  if(!sessions.length){
+    el.innerHTML='<div style="font-family:VT323,monospace;font-size:16px;color:var(--dim);text-align:center;padding:4px">NO SESSIONS YET</div>';
+    return;
+  }
+  const totalSaved=getDaySavedSec(todayKey());
+  el.innerHTML=sessions.map((s,i)=>
+    `<div class="stat-row"><span class="stat-label">SESSION ${i+1}</span><span class="stat-value dim">${fmtSec(s)}</span></div>`
+  ).join('')+
+  `<div class="stat-row" style="margin-top:2px">
+    <span class="stat-label" style="color:var(--white)">TOTAL TODAY</span>
+    <span class="stat-value good">${fmtSec(totalSaved)}</span>
+  </div>`;
+}
+function renderTimerWeekBars(){
+  reloadCFG();
+  const d=new Date(), dow=d.getDay()||7;
+  let weekTotal=0;
+  const barsEl=document.getElementById('timer-week-bars'); barsEl.innerHTML='';
+  for(let i=1;i<=7;i++){
+    const dayIdx=i%7; if(dayIdx===0) continue;
+    const dd=new Date(d); dd.setDate(d.getDate()+(i-dow));
+    const key=`${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,'0')}-${String(dd.getDate()).padStart(2,'0')}`;
+    const used=getDayMinutes(key), lim=CFG.dayLimit[dayIdx]??0;
+    const isToday=(i-dow)===0, isFuture=(i-dow)>0;
+    weekTotal+=used;
+    const pct=lim>0?Math.min(100,(used/lim)*100):0;
+    let fc=''; if(used>lim&&lim>0)fc='over'; else if(used>0&&used>=lim&&lim>0)fc='perfect';
+    const row=document.createElement('div'); row.className='week-mini-row';
+    row.innerHTML=`
+      <div class="week-mini-day ${isToday?'today':''}">${DAY_NAMES[dayIdx]}</div>
+      <div class="week-mini-track"><div class="week-mini-fill ${fc}" style="width:${isFuture?0:pct}%"></div></div>
+      <div class="week-mini-min" style="${isFuture?'color:var(--border)':''}">${isFuture?'·':used+'m'}/${lim}m</div>`;
+    barsEl.appendChild(row);
+  }
+  const cap=CFG.weekCap, remain=Math.max(0,cap-weekTotal);
+  const remEl=document.getElementById('timer-week-remain');
+  remEl.textContent=fmtMin(remain);
+  remEl.className='week-cap-val '+(remain===0?'bad':remain<60?'warn':'good');
+  const wpct=cap>0?Math.min(100,(weekTotal/cap)*100):0;
+  const wb=document.getElementById('timer-weekly-bar');
+  wb.style.width=wpct+'%';
+  wb.className=(wpct>=100?'overtime':wpct>=80?'warning':'');
+}
+function startTimer(){
+  if(timerRunning) return;
+  if(new Date().getDay()===0){ showToast('NO GAMES ON SUNDAY!'); return; }
+  timerRunning=true;
+  sessionStart=Date.now();
+  timerInterval=setInterval(()=>{
+    updateTimerDisplay();
+    const liveSec=getLiveSec();
+    if(!window._capWarned && Math.round(liveSec/60)>=CFG.weekCap){
+      window._capWarned=true; showToast('⚠ WEEKLY CAP REACHED!');
+    }
+  },1000);
+  document.getElementById('btn-start').style.display='none';
+  document.getElementById('btn-stop').style.display='block';
+  showToast('▶ GAME ON!');
+}
+function stopTimer(){
+  if(!timerRunning) return;
+  clearInterval(timerInterval); timerRunning=false;
+  const secs=Math.floor((Date.now()-sessionStart)/1000);
+  sessionStart=null;
+  if(secs>0){
+    addDaySeconds(todayKey(),secs);
+    const d=loadData();
+    if(!d.sessions)d.sessions={};
+    if(!d.sessions[todayKey()])d.sessions[todayKey()]=[];
+    d.sessions[todayKey()].push(secs);
+    saveData(d); archiveWeekIfNeeded();
+  }
+  document.getElementById('btn-start').style.display='block';
+  document.getElementById('btn-stop').style.display='none';
+  renderTimerView();
+  showToast(`■ STOPPED · +${fmtSec(secs)}`);
+}
+// ════════════════════════════════
+//  REPORT (menu)
+// ════════════════════════════════
+function renderReport(){
+  reloadCFG();
+  const d=new Date(), dow=d.getDay()||7;
+  let weekTotal=0;
+  const barsEl=document.getElementById('week-bars'); barsEl.innerHTML='';
+  for(let i=1;i<=7;i++){
+    const dayIdx=i%7; if(dayIdx===0) continue;
+    const dd=new Date(d); dd.setDate(d.getDate()+(i-dow));
+    const key=`${dd.getFullYear()}-${String(dd.getMonth()+1).padStart(2,'0')}-${String(dd.getDate()).padStart(2,'0')}`;
+    const used=getDayMinutes(key), lim=CFG.dayLimit[dayIdx]??0;
+    const isToday=(i-dow)===0, isFuture=(i-dow)>0;
+    weekTotal+=used;
+    const pct=lim>0?Math.min(100,(used/lim)*100):0;
+    let fc=''; if(used>lim&&lim>0)fc='over'; else if(used>0&&used>=lim&&lim>0)fc='perfect';
+    const row=document.createElement('div'); row.className='week-bar-row';
+    row.innerHTML=`
+      <div class="week-bar-day ${isToday?'today':''}">${DAY_NAMES[dayIdx]}</div>
+      <div class="week-bar-track"><div class="week-bar-fill ${fc}" style="width:${isFuture?0:pct}%"></div></div>
+      <div class="week-bar-min" style="${isFuture?'color:var(--border)':''}">${isFuture?'--':used+'m'}/${lim}m</div>`;
+    barsEl.appendChild(row);
+  }
+  const cap=CFG.weekCap, remain=Math.max(0,cap-weekTotal);
+  const rt=document.getElementById('rpt-total');
+  rt.textContent=fmtMin(weekTotal);
+  rt.className='stat-value '+(weekTotal>cap?'bad':weekTotal>cap*0.8?'warn':'good');
+  document.getElementById('rpt-cap').textContent      =fmtMin(cap);
+  document.getElementById('rpt-remaining').textContent=fmtMin(remain);
+  const wpct=cap>0?Math.min(100,(weekTotal/cap)*100):0;
+  const wb=document.getElementById('weekly-progress-bar');
+  wb.style.width=wpct+'%';
+  wb.className='progress-bar'+(wpct>=100?' overtime':wpct>=80?' warning':'');
+  renderHistory();
+}
+function renderHistory(){
+  const hist=loadData().history||[], el=document.getElementById('history-list');
+  if(!hist.length){ el.innerHTML='<div style="font-family:VT323,monospace;font-size:15px;color:var(--dim);text-align:center;padding:10px">NO HISTORY YET</div>'; return; }
+  el.innerHTML='';
+  [...hist].reverse().forEach(w=>{
+    const div=document.createElement('div'); div.className='history-week';
+    div.innerHTML=`
+      <div class="history-week-header" onclick="toggleHistory(this)">
+        <span>WK ${w.weekKey||'?'}</span><span>${fmtMin(Math.round(w.totalSec/60))} used</span>
+      </div>
+      <div class="history-week-body">
+        ${Object.entries(w.days||{}).map(([k,v])=>`<div class="stat-row"><span class="stat-label">${k.slice(5)}</span><span class="stat-value">${Math.round(v/60)}m</span></div>`).join('')}
+      </div>`;
+    el.appendChild(div);
+  });
+}
+function toggleHistory(h){ h.nextElementSibling.classList.toggle('open'); }
+function confirmReset(){
+  if(confirm("RESET THIS WEEK'S DATA? (History is kept)")){
+    const d=loadData(); d.days={}; d.sessions={}; d.checklist={}; saveData(d);
+    renderReport(); showToast('WEEK DATA RESET');
+  }
+}
+// ════════════════════════════════
+//  SETTINGS
+// ════════════════════════════════
+function renderSettingsPage(){
+  const s=getSettings();
+  const clEl=document.getElementById('settings-checklist'); clEl.innerHTML='';
+  s.checklist.forEach((item,idx)=>{
+    const row=document.createElement('div'); row.className='setting-item';
+    row.innerHTML=`<input type="text" value="${escHtml(item.label)}" data-idx="${idx}" placeholder="Enter task..."><button class="del-btn" onclick="deleteChecklistItem(${idx})">✕</button>`;
+    clEl.appendChild(row);
+  });
+  const dlEl=document.getElementById('settings-limits'); dlEl.innerHTML='';
+  [1,2,3,4,5,6,0].forEach(di=>{
+    const row=document.createElement('div'); row.className='setting-item';
+    row.innerHTML=`<span class="setting-day-label">${DAY_NAMES[di]}</span><input type="number" id="limit-${di}" value="${s.dayLimit[di]??0}" min="0" max="999"><span class="setting-unit">MIN</span>`;
+    dlEl.appendChild(row);
+  });
+  document.getElementById('settings-weekly-cap').value=s.weekCap;
+}
+function deleteChecklistItem(idx){
+  const s=getSettings(); s.checklist.splice(idx,1); saveSettingsData(s); renderSettingsPage(); showToast('ITEM REMOVED');
+}
+function addChecklistItem(){
+  const s=getSettings(); s.checklist.push({id:'item_'+Date.now(),label:''}); saveSettingsData(s); renderSettingsPage();
+  const inputs=document.querySelectorAll('#settings-checklist input[type="text"]');
+  if(inputs.length) inputs[inputs.length-1].focus();
+}
+function saveSettings(){
+  const s=getSettings();
+  document.querySelectorAll('#settings-checklist input[type="text"]').forEach((inp,idx)=>{
+    if(s.checklist[idx]) s.checklist[idx].label=inp.value.trim()||s.checklist[idx].label;
+  });
+  s.checklist=s.checklist.filter(i=>i.label.length>0);
+  [0,1,2,3,4,5,6].forEach(di=>{
+    const el=document.getElementById('limit-'+di);
+    if(el) s.dayLimit[di]=Math.max(0,parseInt(el.value)||0);
+  });
+  s.weekCap=Math.max(0,parseInt(document.getElementById('settings-weekly-cap').value)||0);
+  saveSettingsData(s); reloadCFG(); renderSettingsPage(); showToast('✓ SETTINGS SAVED!');
+}
+function restoreDefaults(){
+  if(confirm('RESTORE ALL DEFAULT SETTINGS?')){ localStorage.removeItem('levelup_settings'); reloadCFG(); renderSettingsPage(); showToast('DEFAULTS RESTORED'); }
+}
+// ════════════════════════════════
+//  ARCHIVE
+// ════════════════════════════════
+function archiveWeekIfNeeded(){
+  const data=loadData(), wk=weekKey();
+  if(data.lastArchivedWeek===wk) return;
+  if(data.lastArchivedWeek&&data.lastArchivedWeek!==wk){
+    const totalSec=Object.values(data.days||{}).reduce((a,b)=>a+b,0);
+    if(totalSec>0){
+      if(!data.history)data.history=[];
+      data.history.push({weekKey:data.lastArchivedWeek,totalSec,days:{...data.days}});
+      if(data.history.length>6)data.history.shift();
+    }
+    data.days={}; data.sessions={}; data.checklist={};
+  }
+  data.lastArchivedWeek=wk; saveData(data);
+}
+// ════════════════════════════════
+//  UTILS
+// ════════════════════════════════
+function fmtSec(s){ const m=Math.floor(s/60),sec=s%60; return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`; }
+function fmtMin(m){ return m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m}m`; }
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+let toastTimeout;
+function showToast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimeout); toastTimeout=setTimeout(()=>t.classList.remove('show'),2200);
+}
+// ════════════════════════════════
+//  INIT
+// ════════════════════════════════
+updateHeader();
+archiveWeekIfNeeded();
+initMain();
+setInterval(updateHeader,60000);
+</script>
+</body>
+</html>
+
+This is our starting code for a standalone mini phone app to use before screentime, review and then well make changes. You may need to create the actual file in the folder to get us started too
