@@ -6,6 +6,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Level Up">
+<link rel="icon" type="image/png" href="icon-180.png">
+<link rel="apple-touch-icon" href="icon-180.png">
 <title>Level Up</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&display=swap');
@@ -72,8 +74,8 @@
   .card-title { font-size:12px; color:var(--yellow); letter-spacing:2px; margin-bottom:14px; text-shadow:0 0 6px var(--yellow); }
   .stat-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:2px solid var(--border); }
   .stat-row:last-child { border-bottom:none; }
-  .stat-label { font-family:'VT323',monospace; font-size:22px; color:var(--dim); }
-  .stat-value { font-family:'VT323',monospace; font-size:22px; color:var(--white); }
+  .stat-label { font-family:'VT323',monospace; font-size:26px; color:var(--dim); }
+  .stat-value { font-family:'VT323',monospace; font-size:26px; color:var(--white); }
   .stat-value.good { color:var(--green); }
   .stat-value.warn { color:var(--yellow); }
   .stat-value.bad  { color:var(--red); }
@@ -113,7 +115,7 @@
     margin-bottom:8px; gap:6px; flex-wrap:wrap;
   }
   .timer-card-header .card-title { margin-bottom:0; flex-shrink:0; }
-  #timer-allowed-inline { font-family:'VT323',monospace; font-size:21px; color:var(--blue); white-space:nowrap; }
+  #timer-allowed-inline { font-family:'VT323',monospace; font-size:24px; color:var(--blue); white-space:nowrap; }
   #timer-display {
     font-size:76px; text-align:center; color:var(--green);
     text-shadow:0 0 24px var(--green),0 0 48px rgba(57,255,20,0.15);
@@ -121,23 +123,23 @@
   }
   #timer-display.warning { color:var(--yellow); text-shadow:0 0 24px var(--yellow); }
   #timer-display.overtime { color:var(--red); text-shadow:0 0 24px var(--red); animation:blink 0.5s step-end infinite; }
-  #timer-sublabel { text-align:center; font-family:'VT323',monospace; font-size:20px; color:var(--dim); margin-bottom:10px; }
+  #timer-sublabel { text-align:center; font-family:'VT323',monospace; font-size:24px; color:var(--dim); margin-bottom:10px; }
   #timer-progress-wrap { height:12px; background:var(--bg); border:2px solid var(--border); margin-bottom:16px; overflow:hidden; }
   #timer-progress-bar  { height:100%; background:var(--green); transition:width 1s linear,background 0.5s; }
   #timer-progress-bar.warning { background:var(--yellow); }
   #timer-progress-bar.overtime { background:var(--red); width:100%!important; }
   /* Inline week report on timer screen */
-  .week-mini-row { display:flex; align-items:center; gap:6px; margin-bottom:8px; }
-  .week-mini-day { font-family:'VT323',monospace; font-size:20px; width:36px; color:var(--dim); flex-shrink:0; }
+  .week-mini-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+  .week-mini-day { font-family:'VT323',monospace; font-size:24px; width:42px; color:var(--dim); flex-shrink:0; }
   .week-mini-day.today { color:var(--yellow); }
-  .week-mini-track { flex:1; height:14px; background:var(--bg); border:2px solid var(--border); overflow:hidden; }
+  .week-mini-track { flex:1; height:18px; background:var(--bg); border:2px solid var(--border); overflow:hidden; }
   .week-mini-fill  { height:100%; background:var(--blue); transition:width 0.4s ease; }
   .week-mini-fill.over    { background:var(--red); }
   .week-mini-fill.perfect { background:var(--green); }
-  .week-mini-min  { font-family:'VT323',monospace; font-size:18px; color:var(--dim); width:56px; text-align:right; flex-shrink:0; }
+  .week-mini-min  { font-family:'VT323',monospace; font-size:22px; color:var(--dim); width:64px; text-align:right; flex-shrink:0; }
   .week-cap-row   { display:flex; justify-content:space-between; align-items:center; padding-top:8px; margin-top:4px; border-top:2px solid var(--border); }
-  .week-cap-label { font-family:'VT323',monospace; font-size:20px; color:var(--dim); }
-  .week-cap-val   { font-family:'VT323',monospace; font-size:22px; }
+  .week-cap-label { font-family:'VT323',monospace; font-size:24px; color:var(--dim); }
+  .week-cap-val   { font-family:'VT323',monospace; font-size:26px; }
   /* ── MENU SCREEN ── */
   #screen-menu { padding:0; }
   #menu-tabs { display:flex; border-bottom:3px solid var(--border); background:var(--panel); flex-shrink:0; }
@@ -150,17 +152,17 @@
   .menu-page { display:none; }
   .menu-page.active { display:block; animation:fadeIn 0.15s ease; }
   /* Report inside menu */
-  .week-bar-row { display:flex; align-items:center; gap:6px; margin-bottom:9px; }
-  .week-bar-day { font-family:'VT323',monospace; font-size:22px; width:38px; color:var(--dim); flex-shrink:0; }
+  .week-bar-row { display:flex; align-items:center; gap:8px; margin-bottom:11px; }
+  .week-bar-day { font-family:'VT323',monospace; font-size:26px; width:44px; color:var(--dim); flex-shrink:0; }
   .week-bar-day.today { color:var(--yellow); }
-  .week-bar-track { flex:1; height:16px; background:var(--bg); border:2px solid var(--border); overflow:hidden; }
+  .week-bar-track { flex:1; height:20px; background:var(--bg); border:2px solid var(--border); overflow:hidden; }
   .week-bar-fill  { height:100%; background:var(--blue); transition:width 0.4s ease; }
   .week-bar-fill.over    { background:var(--red); }
   .week-bar-fill.perfect { background:var(--green); }
-  .week-bar-min   { font-family:'VT323',monospace; font-size:20px; color:var(--dim); width:60px; text-align:right; flex-shrink:0; }
+  .week-bar-min   { font-family:'VT323',monospace; font-size:24px; color:var(--dim); width:68px; text-align:right; flex-shrink:0; }
   .history-week { margin-bottom:8px; border:2px solid var(--border); }
-  .history-week-header { background:var(--border); padding:10px 12px; font-family:'VT323',monospace; font-size:20px; color:var(--dim); display:flex; justify-content:space-between; cursor:pointer; }
-  .history-week-body { padding:8px 10px; display:none; }
+  .history-week-header { background:var(--border); padding:12px 14px; font-family:'VT323',monospace; font-size:24px; color:var(--dim); display:flex; justify-content:space-between; cursor:pointer; }
+  .history-week-body { padding:10px 12px; display:none; }
   .history-week-body.open { display:block; }
   .section-divider { font-size:10px; color:var(--dim); letter-spacing:3px; text-align:center; padding:8px 0 12px; }
   /* Settings inside menu */
