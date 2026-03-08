@@ -284,6 +284,7 @@
             <div class="stat-row"><span class="stat-label">REMAINING</span> <span class="stat-value" id="rpt-remaining">--</span></div>
           </div>
           <div class="progress-wrap" style="margin-top:8px"><div class="progress-bar" id="weekly-progress-bar"></div></div>
+          <div id="rpt-resets" style="display:none"></div>
         </div>
         <div class="section-divider">— PAST 6 WEEKS —</div>
         <div id="history-list"></div>
@@ -562,20 +563,34 @@ function updateTimerDisplay(){
   renderTimerAllowed();
 }
 function renderSessionLog(){
-  const sessions=loadData().sessions?.[todayKey()]||[];
+  const data=loadData();
+  const sessions=data.sessions?.[todayKey()]||[];
+  const resets=data.resets||[];
   const el=document.getElementById('session-log');
-  if(!sessions.length){
+  let html='';
+  if(!sessions.length && !resets.length){
     el.innerHTML='<div style="font-family:VT323,monospace;font-size:16px;color:var(--dim);text-align:center;padding:4px">NO SESSIONS YET</div>';
     return;
   }
-  const totalSaved=getDaySavedSec(todayKey());
-  el.innerHTML=sessions.map((s,i)=>
-    `<div class="stat-row"><span class="stat-label">SESSION ${i+1}</span><span class="stat-value dim">${fmtSec(s)}</span></div>`
-  ).join('')+
-  `<div class="stat-row" style="margin-top:2px">
-    <span class="stat-label" style="color:var(--white)">TOTAL TODAY</span>
-    <span class="stat-value good">${fmtSec(totalSaved)}</span>
-  </div>`;
+  if(sessions.length){
+    const totalSaved=getDaySavedSec(todayKey());
+    html+=sessions.map((s,i)=>
+      `<div class="stat-row"><span class="stat-label">SESSION ${i+1}</span><span class="stat-value dim">${fmtSec(s)}</span></div>`
+    ).join('')+
+    `<div class="stat-row" style="margin-top:2px">
+      <span class="stat-label" style="color:var(--white)">TOTAL TODAY</span>
+      <span class="stat-value good">${fmtSec(totalSaved)}</span>
+    </div>`;
+  }
+  if(resets.length){
+    html+=`<div style="margin-top:8px;padding-top:8px;border-top:2px solid var(--border)">`;
+    html+=`<div style="font-family:VT323,monospace;font-size:20px;color:var(--red);margin-bottom:6px">DATA CLEARED</div>`;
+    resets.forEach(r=>{
+      html+=`<div style="font-family:VT323,monospace;font-size:18px;color:var(--dim);padding:2px 0">↺ ${escHtml(r.label)}</div>`;
+    });
+    html+=`</div>`;
+  }
+  el.innerHTML=html;
 }
 function renderTimerWeekBars(){
   reloadCFG();
@@ -677,6 +692,16 @@ function renderReport(){
   const wb=document.getElementById('weekly-progress-bar');
   wb.style.width=wpct+'%';
   wb.className='progress-bar'+(wpct>=100?' overtime':wpct>=80?' warning':'');
+  // Show resets in report
+  const resets=loadData().resets||[];
+  const resetEl=document.getElementById('rpt-resets');
+  if(resets.length){
+    resetEl.innerHTML=`<div class="card-title" style="color:var(--red);margin-top:4px">DATA CLEARS</div>`+
+      resets.map(r=>`<div class="stat-row"><span class="stat-label" style="color:var(--dim)">↺ ${escHtml(r.label)}</span></div>`).join('');
+    resetEl.style.display='block';
+  } else {
+    resetEl.style.display='none';
+  }
   renderHistory();
 }
 function renderHistory(){
@@ -698,7 +723,15 @@ function renderHistory(){
 function toggleHistory(h){ h.nextElementSibling.classList.toggle('open'); }
 function confirmReset(){
   if(confirm("RESET THIS WEEK'S DATA? (History is kept)")){
-    const d=loadData(); d.days={}; d.sessions={}; d.checklist={}; saveData(d);
+    const d=loadData();
+    // Log the reset
+    if(!d.resets) d.resets=[];
+    const now=new Date();
+    d.resets.push({
+      time: now.toISOString(),
+      label: `${FULL_NAMES[now.getDay()]} ${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`
+    });
+    d.days={}; d.sessions={}; d.checklist={}; saveData(d);
     renderReport(); showToast('WEEK DATA RESET');
   }
 }
