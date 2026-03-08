@@ -422,6 +422,7 @@ function switchMenuTab(name){
 // ════════════════════════════════
 function initMain(){
   reloadCFG();
+  restoreTimerState();
   const dow=new Date().getDay();
   if(dow===0){
     // Sunday: show checklist screen with sunday block
@@ -430,7 +431,7 @@ function initMain(){
   }
   const checks=loadChecks(), items=CFG.checklist;
   const allDone=items.length>0&&items.every(i=>checks[i.id]);
-  goScreen(allDone?'timer':'checklist');
+  goScreen(allDone||timerRunning?'timer':'checklist');
 }
 // ════════════════════════════════
 //  CHECKLIST
@@ -488,6 +489,43 @@ function goBackToChecklist(){
 //  TIMER
 // ════════════════════════════════
 let timerInterval=null, timerRunning=false, sessionStart=null;
+function saveTimerState(){
+  if(timerRunning){
+    localStorage.setItem('levelup_timer',JSON.stringify({running:true,start:sessionStart,day:todayKey()}));
+  } else {
+    localStorage.removeItem('levelup_timer');
+  }
+}
+function restoreTimerState(){
+  try{
+    const s=JSON.parse(localStorage.getItem('levelup_timer')||'null');
+    if(s&&s.running&&s.day===todayKey()){
+      timerRunning=true;
+      sessionStart=s.start;
+      timerInterval=setInterval(()=>{
+        updateTimerDisplay();
+        const liveSec=getLiveSec();
+        if(!window._capWarned && Math.round(liveSec/60)>=CFG.weekCap){
+          window._capWarned=true; showToast('⚠ WEEKLY CAP REACHED!');
+        }
+      },1000);
+      document.getElementById('btn-start').style.display='none';
+      document.getElementById('btn-stop').style.display='block';
+    } else if(s&&s.running&&s.day!==todayKey()){
+      // Timer was running from a previous day — auto-stop it
+      const secs=Math.floor((Date.now()-s.start)/1000);
+      if(secs>0){
+        addDaySeconds(s.day,secs);
+        const d=loadData();
+        if(!d.sessions)d.sessions={};
+        if(!d.sessions[s.day])d.sessions[s.day]=[];
+        d.sessions[s.day].push(secs);
+        saveData(d);
+      }
+      localStorage.removeItem('levelup_timer');
+    }
+  }catch(e){ localStorage.removeItem('levelup_timer'); }
+}
 function getAllowedMin(){ reloadCFG(); return CFG.dayLimit[new Date().getDay()]??0; }
 function getLiveSec(){
   const saved=getDaySavedSec(todayKey());
@@ -574,6 +612,7 @@ function startTimer(){
   if(new Date().getDay()===0){ showToast('NO GAMES ON SUNDAY!'); return; }
   timerRunning=true;
   sessionStart=Date.now();
+  saveTimerState();
   timerInterval=setInterval(()=>{
     updateTimerDisplay();
     const liveSec=getLiveSec();
@@ -590,6 +629,7 @@ function stopTimer(){
   clearInterval(timerInterval); timerRunning=false;
   const secs=Math.floor((Date.now()-sessionStart)/1000);
   sessionStart=null;
+  saveTimerState();
   if(secs>0){
     addDaySeconds(todayKey(),secs);
     const d=loadData();
@@ -740,6 +780,13 @@ updateHeader();
 archiveWeekIfNeeded();
 initMain();
 setInterval(updateHeader,60000);
+// Refresh display when returning to app (iOS suspends JS in background)
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden){
+    if(timerRunning) updateTimerDisplay();
+    if(currentScreen==='timer') renderTimerView();
+  }
+});
 </script>
 </body>
 </html>
